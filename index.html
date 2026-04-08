@@ -27,7 +27,7 @@
     }
     .layout {
       display: grid;
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 390px 1fr;
       height: 100vh;
     }
     .sidebar {
@@ -96,6 +96,21 @@
       font-size: 14px;
       line-height: 1.4;
     }
+    .item-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .pin-toggle {
+      margin-top: 3px;
+      transform: scale(1.15);
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .item-main {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
     .controls {
       display: flex;
       gap: 8px;
@@ -116,8 +131,8 @@
       font-weight: 700;
     }
     .num-marker {
-      width: 28px;
-      height: 28px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -143,13 +158,14 @@
       font-size: 12px;
       line-height: 1.45;
       box-shadow: 0 2px 8px rgba(0,0,0,.1);
+      max-width: 280px;
     }
     .legend div { margin-bottom: 4px; }
     a.jump {
       color: inherit;
       text-decoration: none;
     }
-    @media (max-width: 960px) {
+    @media (max-width: 980px) {
       .layout {
         grid-template-columns: 1fr;
         grid-template-rows: 48vh 52vh;
@@ -184,10 +200,15 @@
         <button onclick="fitAll()">Pokaż wszystkie</button>
         <button onclick="showOnly('all')">Wszystkie</button>
         <button onclick="showOnly('approx')">Tylko przybliżone</button>
+        <button onclick="setAllEnabled(true)">Zaznacz wszystkie</button>
+        <button onclick="setAllEnabled(false)">Odznacz wszystkie</button>
+      </div>
+
+      <div class="sub" style="margin-top:-4px; margin-bottom:12px;">
+        Użyj checkboxów przy adresach, aby ukrywać i pokazywać konkretne pinezki na mapie.
       </div>
 
       <div class="status" id="status">Uruchamianie mapy…</div>
-
       <div id="list"></div>
     </aside>
 
@@ -197,6 +218,7 @@
         <div><strong>Legenda</strong></div>
         <div>Numery na pinach odpowiadają liście po lewej.</div>
         <div>Adresy z numerem domu mają priorytet przy geokodowaniu.</div>
+        <div>Przy niepełnych wpisach mapa zostawia przybliżenie.</div>
       </div>
     </main>
   </div>
@@ -204,21 +226,24 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script>
-    const locations = [{"nr": 1, "label": "Łomianki", "query": "Łomianki, Polska", "fallback_lat": 52.33413, "fallback_lon": 20.88602, "precision": "miejscowość", "notes": "Pin dla miejscowości.", "people": ["Monika i Sebastian Siwińscy", "Aurelia Siw (dziecko)", "Antoni Siw (dziecko)", "Henia i Maciek Sit"]}, {"nr": 2, "label": "Marki", "query": "Marki, Polska", "fallback_lat": 52.32065, "fallback_lon": 21.10474, "precision": "miejscowość", "notes": "Brak dokładnej ulicy w notatce.", "people": ["Krystyna Ćwi + osoba towarzysząca", "Aleksandra Ćwi + osoba towarzysząca", "Anna Ćwi + osoba towarzysząca"]}, {"nr": 3, "label": "Pruszków, Zdziarska 47F/6", "query": "Zdziarska 47, 05-800 Pruszków, Polska", "fallback_lat": 52.17072, "fallback_lon": 20.81214, "precision": "adres", "notes": "W notatce było „Pruszków Zdziarska 47f/6”.", "people": ["Tomasz Józ", "Marta Józ", "Aurelia (dziecko)"]}, {"nr": 4, "label": "Szczałb 2", "query": "Szczałb 2, 21-470 Szczałb, Polska", "fallback_lat": 51.776111, "fallback_lon": 22.236667, "precision": "adres", "notes": "Wieś Szczałb, gmina Krzywda.", "people": ["Grażyna Józ (chrzestna)", "Andrzej Józ"]}, {"nr": 5, "label": "Radoryż Smolany", "query": "Radoryż Smolany, Polska", "fallback_lat": 51.802, "fallback_lon": 22.1245, "precision": "miejscowość", "notes": "Brak pełnego adresu.", "people": ["Katarzyna Żura + osoba towarzysząca"]}, {"nr": 6, "label": "Radoryż Smolany 7/6", "query": "Radoryż Smolany 7/6, Polska", "fallback_lat": 51.802, "fallback_lon": 22.1245, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w centrum miejscowości.", "people": ["Natalia Żura", "osoba towarzysząca / córka Katarzyna"]}, {"nr": 7, "label": "Zimna Woda 51", "query": "Zimna Woda 51, 21-470 Zimna Woda, Polska", "fallback_lat": 51.799722, "fallback_lon": 22.24, "precision": "adres", "notes": "Najbardziej prawdopodobnie Zimna Woda w gminie Krzywda.", "people": ["Agnieszka Kor + osoba towarzysząca"]}, {"nr": 8, "label": "Burzecka 8, 21-411 Wojcieszków", "query": "Burzecka 8, 21-411 Wojcieszków, Polska", "fallback_lat": 51.769986, "fallback_lon": 22.273236, "precision": "adres", "notes": "Adres zgrupowany dla rodziny Gar.", "people": ["Roman Gar", "Agata Gar", "Sylwester Gar", "Agnieszka Gar", "Zosia (dziecko)", "Patryk Gar + osoba towarzysząca", "Julia Gar + osoba towarzysząca"]}, {"nr": 9, "label": "Marki, Pastelowa 47", "query": "Pastelowa 47, 05-270 Marki, Polska", "fallback_lat": 52.32065, "fallback_lon": 21.10474, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w Markach.", "people": ["Irena Zas", "Adam Zas", "Marysia Zas + osoba towarzysząca"]}, {"nr": 10, "label": "Zabrodzie, Starowiejska 7", "query": "Starowiejska 7, 07-230 Zabrodzie, Polska", "fallback_lat": 52.5167, "fallback_lon": 21.4333, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w Zabrodziu.", "people": ["Iwona Chu", "Wiesiek Chu", "Bartosz Chu + osoba towarzysząca"]}, {"nr": 11, "label": "Zamość obok Sierpca", "query": "Zamość, gmina Rościszewo, powiat sierpecki, Polska", "fallback_lat": 52.888611, "fallback_lon": 19.774722, "precision": "miejscowość", "notes": "Przyjęty Zamość w powiecie sierpeckim.", "people": ["Halina i Tomasz Pian", "Marzena i Kamil Pian", "Liliana (córka Kamila)", "Monika i Kamil Kami", "Zyta Gór"]}, {"nr": 12, "label": "Otwock", "query": "Otwock, Polska", "fallback_lat": 52.1058, "fallback_lon": 21.2613, "precision": "miejscowość", "notes": "Pin dla miasta.", "people": ["Edyta i Mariusz Osi", "Michał Osica (dziecko)"]}, {"nr": 13, "label": "Warszawa Okęcie", "query": "Okęcie, Warszawa, Polska", "fallback_lat": 52.1833, "fallback_lon": 20.95, "precision": "dzielnica/obszar", "notes": "Brak dokładnej ulicy.", "people": ["Marcin i Monika Górak", "Damian Gór + osoba towarzysząca", "Piotr Gór + osoba towarzysząca"]}, {"nr": 14, "label": "Warszawa, ul. Broniewskiego", "query": "Władysława Broniewskiego, Warszawa, Polska", "fallback_lat": 52.269, "fallback_lon": 20.9595, "precision": "ulica", "notes": "Przybliżenie do środkowego odcinka ulicy.", "people": ["Aldona i Kazimierz Gra?"]}, {"nr": 15, "label": "Warszawa Białołęka", "query": "Białołęka, Warszawa, Polska", "fallback_lat": 52.3213, "fallback_lon": 20.972, "precision": "dzielnica", "notes": "Brak dokładnej ulicy.", "people": ["Ewelina i Krzysztof Bal"]}, {"nr": 16, "label": "Zielonka", "query": "Zielonka, Polska", "fallback_lat": 52.30376, "fallback_lon": 21.16018, "precision": "miejscowość", "notes": "Pin dla miasta.", "people": ["Danuta i Stanisław Krze"]}, {"nr": 17, "label": "Warszawa Ursynów", "query": "Ursynów, Warszawa, Polska", "fallback_lat": 52.15051, "fallback_lon": 21.05041, "precision": "dzielnica", "notes": "Brak dokładnej ulicy.", "people": ["Ania Wodzyńska i Michał Koz"]}, {"nr": 18, "label": "Warszawa", "query": "Warszawa, Polska", "fallback_lat": 52.22968, "fallback_lon": 21.01223, "precision": "miasto", "notes": "Brak dokładniejszego adresu.", "people": ["Agnieszka Sar"]}];
-    const map = L.map('map').setView([52.15, 21.05], 8);
+    const locations = [{"nr": 1, "label": "Łomianki", "query": "Łomianki, Polska", "fallback_lat": 52.33413, "fallback_lon": 20.88602, "precision": "miejscowość", "notes": "Pin dla miejscowości.", "people": ["Monika i Sebastian Siw", "Aurelia Siw (dziecko)", "Antoni Siw (dziecko)", "Henia i Maciek Sit"]}, {"nr": 2, "label": "Marki", "query": "Marki, Polska", "fallback_lat": 52.32065, "fallback_lon": 21.10474, "precision": "miejscowość", "notes": "Brak dokładnej ulicy w notatce.", "people": ["Krystyna Ćwi + osoba towarzysząca", "Aleksandra Ćwi + osoba towarzysząca", "Anna Ćwi + osoba towarzysząca"]}, {"nr": 3, "label": "Zamość obok Sierpca", "query": "Zamość, gmina Rościszewo, powiat sierpecki, Polska", "fallback_lat": 52.888611, "fallback_lon": 19.774722, "precision": "miejscowość", "notes": "Przyjęty Zamość w powiecie sierpeckim.", "people": ["Halina i Tomasz Pian", "Marzena i Kamil Pian", "Liliana (córka Kamila)", "Monika i Kamil Kami"]}, {"nr": 4, "label": "Otwock", "query": "Otwock, Polska", "fallback_lat": 52.1058, "fallback_lon": 21.2613, "precision": "miejscowość", "notes": "Pin dla miasta.", "people": ["Edyta i Mariusz Osi", "Michał Osica (dziecko)"]}, {"nr": 5, "label": "Warszawa Okęcie", "query": "Okęcie, Warszawa, Polska", "fallback_lat": 52.1833, "fallback_lon": 20.95, "precision": "dzielnica/obszar", "notes": "Brak dokładnej ulicy.", "people": ["Marcin i Monika Gór", "Damian Gór + osoba towarzysząca", "Marcina Piotr Gór + osoba towarzysząca"]}, {"nr": 6, "label": "Warszawa, ul. Broniewskiego", "query": "Władysława Broniewskiego, Warszawa, Polska", "fallback_lat": 52.269, "fallback_lon": 20.9595, "precision": "ulica", "notes": "Przybliżenie do środkowego odcinka ulicy.", "people": ["Aldona i Kazimierz Gra?"]}, {"nr": 7, "label": "Warszawa Białołęka", "query": "Białołęka, Warszawa, Polska", "fallback_lat": 52.3213, "fallback_lon": 20.972, "precision": "dzielnica", "notes": "Brak dokładnej ulicy.", "people": ["Ewelina i Krzysztof Bal"]}, {"nr": 8, "label": "Zielonka Nowa 113, 26-700", "query": "Zielonka Nowa 113, 26-700 Polska", "fallback_lat": 51.3425, "fallback_lon": 21.52, "precision": "adres", "notes": "Jeżeli geokodowanie nie znajdzie dokładnego adresu, zostanie przybliżenie dla okolicy kodu 26-700.", "people": ["Danuta i Stanisłał Krze"]}, {"nr": 9, "label": "Warszawa Ursynów", "query": "Ursynów, Warszawa, Polska", "fallback_lat": 52.15051, "fallback_lon": 21.05041, "precision": "dzielnica", "notes": "Brak dokładnej ulicy.", "people": ["Ania Wodz i Michał Koz"]}, {"nr": 10, "label": "Warszawa", "query": "Warszawa, Polska", "fallback_lat": 52.22968, "fallback_lon": 21.01223, "precision": "miasto", "notes": "Brak dokładniejszego adresu.", "people": ["Agnieszka Sar"]}, {"nr": 11, "label": "Stare Piastowo, 09-200", "query": "Stare Piastowo, 09-200 Polska", "fallback_lat": 52.82, "fallback_lon": 19.65, "precision": "miejscowość", "notes": "Przybliżenie dla miejscowości w rejonie kodu 09-200.", "people": ["Zyta Gór"]}, {"nr": 12, "label": "Pruszków, Zdziarska 47F/6", "query": "Zdziarska 47, 05-800 Pruszków, Polska", "fallback_lat": 52.17072, "fallback_lon": 20.81214, "precision": "adres", "notes": "W notatce było „Pruszków Zdziarska 47f/6”.", "people": ["Tomasz Józ", "Marta Józ", "Aurelia (dziecko)"]}, {"nr": 13, "label": "Szczałb 2", "query": "Szczałb 2, 21-470 Szczałb, Polska", "fallback_lat": 51.776111, "fallback_lon": 22.236667, "precision": "adres", "notes": "Wieś Szczałb, gmina Krzywda.", "people": ["Grażyna Józ (chrzestna)", "Andrzej Józ"]}, {"nr": 14, "label": "Radoryż Smolany", "query": "Radoryż Smolany, Polska", "fallback_lat": 51.802, "fallback_lon": 22.1245, "precision": "miejscowość", "notes": "Brak pełnego adresu.", "people": ["Katarzyna Żura + osoba towarzysząca"]}, {"nr": 15, "label": "Radoryż Smolany 7/6", "query": "Radoryż Smolany 7/6, Polska", "fallback_lat": 51.802, "fallback_lon": 22.1245, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w centrum miejscowości.", "people": ["Natalia Żura", "Natalia osoba towarzysząca (córka Katarzyna)"]}, {"nr": 16, "label": "Zimna Woda 51, 21-470", "query": "Zimna Woda 51, 21-470 Polska", "fallback_lat": 51.799722, "fallback_lon": 22.24, "precision": "adres", "notes": "Najbardziej prawdopodobnie Zimna Woda w gminie Krzywda.", "people": ["Agnieszka Kor + osoba towarzysząca"]}, {"nr": 17, "label": "Burzecka 8, 21-411 Wojcieszków", "query": "Burzecka 8, 21-411 Wojcieszków, Polska", "fallback_lat": 51.769986, "fallback_lon": 22.273236, "precision": "adres", "notes": "Adres zgrupowany dla rodziny Gar.", "people": ["Roman Gar", "Agata Gar", "Sylwester Gar", "Agnieszka Gar", "Zosia (dziecko)", "Patryk Gar + osoba towarzysząca", "Julia Gar + osoba towarzysząca"]}, {"nr": 18, "label": "Marki, Pastelowa 47", "query": "Pastelowa 47, 05-270 Marki, Polska", "fallback_lat": 52.32065, "fallback_lon": 21.10474, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w Markach.", "people": ["Irena Zas", "Adam Zas", "Marysia Zas + osoba towarzysząca"]}, {"nr": 19, "label": "Zabrodzie, Starowiejska 7", "query": "Starowiejska 7, 07-230 Zabrodzie, Polska", "fallback_lat": 52.5167, "fallback_lon": 21.4333, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w Zabrodziu.", "people": ["Iwona Chu", "Wiesiek Chu", "Bartosz Chu + osoba towarzysząca"]}];
+    const map = L.map('map').setView([52.10, 20.95], 8);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     let currentFilter = 'all';
+    locations.forEach(item => {
+      if (typeof item.enabled === 'undefined') item.enabled = true;
+    });
 
     function iconFor(status, nr) {
       return L.divIcon({
         className: '',
         html: '<div class="num-marker ' + status + '">' + nr + '</div>',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
         popupAnchor: [0, -10]
       });
     }
@@ -233,7 +258,8 @@
       const list = document.getElementById('list');
       list.innerHTML = '';
       const visible = locations.filter(item => currentFilter === 'all' || item.status !== 'ok');
-      document.getElementById('countAll').textContent = visible.length;
+      const enabledCount = visible.filter(item => item.enabled).length;
+      document.getElementById('countAll').textContent = enabledCount + ' / ' + visible.length;
 
       visible.forEach(item => {
         const peopleHtml = item.people.map(p => '<li>' + escapeHtml(p) + '</li>').join('');
@@ -244,13 +270,19 @@
         const div = document.createElement('div');
         div.className = 'item';
         div.innerHTML =
-          '<a class="jump" href="#" onclick="focusPin(' + item.nr + '); return false;">' +
-            '<h3>' + item.nr + '. ' + escapeHtml(item.label) + '</h3>' +
-          '</a>' +
-          '<div class="small"><strong>Wyszukiwanie:</strong> ' + escapeHtml(item.query) + '</div>' +
-          '<div class="small"><strong>Status:</strong> ' + stateLabel + '</div>' +
-          '<div class="small"><strong>Uwagi:</strong> ' + escapeHtml(item.notes) + '</div>' +
-          '<ul class="people">' + peopleHtml + '</ul>';
+          '<div class="item-top">' +
+            '<input class="pin-toggle" type="checkbox" ' + (item.enabled ? 'checked ' : '') +
+              'onchange="toggleItem(' + item.nr + ', this.checked)" title="Pokaż lub ukryj pinezkę">' +
+            '<div class="item-main">' +
+              '<a class="jump" href="#" onclick="focusPin(' + item.nr + '); return false;">' +
+                '<h3>' + item.nr + '. ' + escapeHtml(item.label) + '</h3>' +
+              '</a>' +
+              '<div class="small"><strong>Wyszukiwanie:</strong> ' + escapeHtml(item.query) + '</div>' +
+              '<div class="small"><strong>Status:</strong> ' + stateLabel + '</div>' +
+              '<div class="small"><strong>Uwagi:</strong> ' + escapeHtml(item.notes) + '</div>' +
+              '<ul class="people">' + peopleHtml + '</ul>' +
+            '</div>' +
+          '</div>';
         list.appendChild(div);
       });
     }
@@ -287,10 +319,8 @@
         if (item.marker) map.removeLayer(item.marker);
       });
       locations.forEach(item => {
-        const show = currentFilter === 'all' || item.status !== 'ok';
-        if (show) {
-          addMarker(item);
-        }
+        const passesFilter = currentFilter === 'all' || item.status !== 'ok';
+        if (passesFilter && item.enabled) addMarker(item);
       });
       fitAll();
       renderList();
@@ -298,7 +328,7 @@
 
     function fitAll() {
       const visibleMarkers = locations
-        .filter(item => currentFilter === 'all' || item.status !== 'ok')
+        .filter(item => (currentFilter === 'all' || item.status !== 'ok') && item.enabled)
         .filter(item => item.marker)
         .map(item => item.marker);
 
@@ -312,9 +342,29 @@
       refreshMarkers();
     }
 
+    function toggleItem(nr, enabled) {
+      const item = locations.find(x => x.nr === nr);
+      if (!item) return;
+      item.enabled = enabled;
+      refreshMarkers();
+    }
+
+    function setAllEnabled(enabled) {
+      locations.forEach(item => {
+        const passesFilter = currentFilter === 'all' || item.status !== 'ok';
+        if (passesFilter) item.enabled = enabled;
+      });
+      refreshMarkers();
+    }
+
     function focusPin(nr) {
       const item = locations.find(x => x.nr === nr);
-      if (!item || !item.marker) return;
+      if (!item) return;
+      if (!item.enabled) {
+        item.enabled = true;
+        refreshMarkers();
+      }
+      if (!item.marker) return;
       map.setView([item.lat, item.lon], Math.max(map.getZoom(), 11));
       item.marker.openPopup();
     }
@@ -353,7 +403,7 @@
         await geocode(item);
         addMarker(item);
         renderList();
-        await delay(1100);
+        await delay(1050);
       }
       fitAll();
       const okCount = locations.filter(x => x.status === 'ok').length;
