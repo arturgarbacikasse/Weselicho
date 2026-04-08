@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mapa zaproszeń</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      --bg: #f7f7f8;
+      --card: #ffffff;
+      --text: #222;
+      --muted: #666;
+      --border: #ddd;
+      --ok: #1f7a1f;
+      --approx: #b26a00;
+      --fallback: #a40000;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      height: 100vh;
+    }
+    .sidebar {
+      overflow: auto;
+      border-right: 1px solid var(--border);
+      background: var(--card);
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .map-wrap {
+      position: relative;
+      height: 100vh;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+      margin-bottom: 14px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      border: 1px solid var(--border);
+      background: #fafafa;
+    }
+    .pill.ok { border-color: #b7ddb7; background: #eef9ee; color: var(--ok); }
+    .pill.approx { border-color: #ecd6ad; background: #fff5df; color: var(--approx); }
+    .pill.fallback { border-color: #e5b2b2; background: #fff0f0; color: var(--fallback); }
+    .status {
+      margin: 10px 0 14px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .item {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+    .item h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+    .small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .people {
+      margin-top: 8px;
+      padding-left: 18px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 12px 0 14px;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #fafafa;
+    }
+    .counter {
+      font-weight: 700;
+    }
+    .num-marker {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,.35);
+    }
+    .num-marker.ok { background: var(--ok); }
+    .num-marker.approx { background: var(--approx); }
+    .num-marker.fallback { background: var(--fallback); }
+    .legend {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      z-index: 700;
+      background: rgba(255,255,255,.96);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.45;
+      box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    }
+    .legend div { margin-bottom: 4px; }
+    a.jump {
+      color: inherit;
+      text-decoration: none;
+    }
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 48vh 52vh;
+      }
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .map-wrap, #map {
+        height: 52vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h1>Mapa do rozdania zaproszeń</h1>
+      <div class="sub">
+        W tej wersji przygotowałem <span class="counter" id="countAll">0</span> pinów.
+        Po otwarciu pliku mapa najpierw spróbuje dopasować dokładne pozycje z adresów,
+        a gdy się nie uda, użyje zapisanych współrzędnych zapasowych.
+      </div>
+
+      <div>
+        <span class="pill ok">zielony — adres dopasowany automatycznie</span>
+        <span class="pill approx">pomarańczowy — przybliżenie z miejscowości / dzielnicy</span>
+        <span class="pill fallback">czerwony — użyto współrzędnych zapasowych</span>
+      </div>
+
+      <div class="controls">
+        <button onclick="fitAll()">Pokaż wszystkie</button>
+        <button onclick="showOnly('all')">Wszystkie</button>
+        <button onclick="showOnly('approx')">Tylko przybliżone</button>
+      </div>
+
+      <div class="status" id="status">Uruchamianie mapy…</div>
+
+      <div id="list"></div>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map"></div>
+      <div class="legend">
+        <div><strong>Legenda</strong></div>
+        <div>Numery na pinach odpowiadają liście po lewej.</div>
+        <div>Adresy z numerem domu mają priorytet przy geokodowaniu.</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const locations = [{"nr": 1, "label": "Łomianki", "query": "Łomianki, Polska", "fallback_lat": 52.33413, "fallback_lon": 20.88602, "precision": "miejscowość", "notes": "Pin dla miejscowości.", "people": ["Monika i Sebastian Siwińscy", "Aurelia Siw (dziecko)", "Antoni Siw (dziecko)", "Henia i Maciek Sit"]}, {"nr": 2, "label": "Marki", "query": "Marki, Polska", "fallback_lat": 52.32065, "fallback_lon": 21.10474, "precision": "miejscowość", "notes": "Brak dokładnej ulicy w notatce.", "people": ["Krystyna Ćwi + osoba towarzysząca", "Aleksandra Ćwi + osoba towarzysząca", "Anna Ćwi + osoba towarzysząca"]}, {"nr": 3, "label": "Pruszków, Zdziarska 47F/6", "query": "Zdziarska 47, 05-800 Pruszków, Polska", "fallback_lat": 52.17072, "fallback_lon": 20.81214, "precision": "adres", "notes": "W notatce było „Pruszków Zdziarska 47f/6”.", "people": ["Tomasz Józ", "Marta Józ", "Aurelia (dziecko)"]}, {"nr": 4, "label": "Szczałb 2", "query": "Szczałb 2, 21-470 Szczałb, Polska", "fallback_lat": 51.776111, "fallback_lon": 22.236667, "precision": "adres", "notes": "Wieś Szczałb, gmina Krzywda.", "people": ["Grażyna Józ (chrzestna)", "Andrzej Józ"]}, {"nr": 5, "label": "Radoryż Smolany", "query": "Radoryż Smolany, Polska", "fallback_lat": 51.802, "fallback_lon": 22.1245, "precision": "miejscowość", "notes": "Brak pełnego adresu.", "people": ["Katarzyna Żura + osoba towarzysząca"]}, {"nr": 6, "label": "Radoryż Smolany 7/6", "query": "Radoryż Smolany 7/6, Polska", "fallback_lat": 51.802, "fallback_lon": 22.1245, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w centrum miejscowości.", "people": ["Natalia Żura", "osoba towarzysząca / córka Katarzyna"]}, {"nr": 7, "label": "Zimna Woda 51", "query": "Zimna Woda 51, 21-470 Zimna Woda, Polska", "fallback_lat": 51.799722, "fallback_lon": 22.24, "precision": "adres", "notes": "Najbardziej prawdopodobnie Zimna Woda w gminie Krzywda.", "people": ["Agnieszka Kor + osoba towarzysząca"]}, {"nr": 8, "label": "Burzecka 8, 21-411 Wojcieszków", "query": "Burzecka 8, 21-411 Wojcieszków, Polska", "fallback_lat": 51.769986, "fallback_lon": 22.273236, "precision": "adres", "notes": "Adres zgrupowany dla rodziny Gar.", "people": ["Roman Gar", "Agata Gar", "Sylwester Gar", "Agnieszka Gar", "Zosia (dziecko)", "Patryk Gar + osoba towarzysząca", "Julia Gar + osoba towarzysząca"]}, {"nr": 9, "label": "Marki, Pastelowa 47", "query": "Pastelowa 47, 05-270 Marki, Polska", "fallback_lat": 52.32065, "fallback_lon": 21.10474, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w Markach.", "people": ["Irena Zas", "Adam Zas", "Marysia Zas + osoba towarzysząca"]}, {"nr": 10, "label": "Zabrodzie, Starowiejska 7", "query": "Starowiejska 7, 07-230 Zabrodzie, Polska", "fallback_lat": 52.5167, "fallback_lon": 21.4333, "precision": "adres", "notes": "Jeżeli geokodowanie nie złapie numeru, zostanie pin w Zabrodziu.", "people": ["Iwona Chu", "Wiesiek Chu", "Bartosz Chu + osoba towarzysząca"]}, {"nr": 11, "label": "Zamość obok Sierpca", "query": "Zamość, gmina Rościszewo, powiat sierpecki, Polska", "fallback_lat": 52.888611, "fallback_lon": 19.774722, "precision": "miejscowość", "notes": "Przyjęty Zamość w powiecie sierpeckim.", "people": ["Halina i Tomasz Pian", "Marzena i Kamil Pian", "Liliana (córka Kamila)", "Monika i Kamil Kami", "Zyta Gór"]}, {"nr": 12, "label": "Otwock", "query": "Otwock, Polska", "fallback_lat": 52.1058, "fallback_lon": 21.2613, "precision": "miejscowość", "notes": "Pin dla miasta.", "people": ["Edyta i Mariusz Osi", "Michał Osica (dziecko)"]}, {"nr": 13, "label": "Warszawa Okęcie", "query": "Okęcie, Warszawa, Polska", "fallback_lat": 52.1833, "fallback_lon": 20.95, "precision": "dzielnica/obszar", "notes": "Brak dokładnej ulicy.", "people": ["Marcin i Monika Górak", "Damian Gór + osoba towarzysząca", "Piotr Gór + osoba towarzysząca"]}, {"nr": 14, "label": "Warszawa, ul. Broniewskiego", "query": "Władysława Broniewskiego, Warszawa, Polska", "fallback_lat": 52.269, "fallback_lon": 20.9595, "precision": "ulica", "notes": "Przybliżenie do środkowego odcinka ulicy.", "people": ["Aldona i Kazimierz Gra?"]}, {"nr": 15, "label": "Warszawa Białołęka", "query": "Białołęka, Warszawa, Polska", "fallback_lat": 52.3213, "fallback_lon": 20.972, "precision": "dzielnica", "notes": "Brak dokładnej ulicy.", "people": ["Ewelina i Krzysztof Bal"]}, {"nr": 16, "label": "Zielonka", "query": "Zielonka, Polska", "fallback_lat": 52.30376, "fallback_lon": 21.16018, "precision": "miejscowość", "notes": "Pin dla miasta.", "people": ["Danuta i Stanisław Krze"]}, {"nr": 17, "label": "Warszawa Ursynów", "query": "Ursynów, Warszawa, Polska", "fallback_lat": 52.15051, "fallback_lon": 21.05041, "precision": "dzielnica", "notes": "Brak dokładnej ulicy.", "people": ["Ania Wodzyńska i Michał Koz"]}, {"nr": 18, "label": "Warszawa", "query": "Warszawa, Polska", "fallback_lat": 52.22968, "fallback_lon": 21.01223, "precision": "miasto", "notes": "Brak dokładniejszego adresu.", "people": ["Agnieszka Sar"]}];
+    const map = L.map('map').setView([52.15, 21.05], 8);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let currentFilter = 'all';
+
+    function iconFor(status, nr) {
+      return L.divIcon({
+        className: '',
+        html: '<div class="num-marker ' + status + '">' + nr + '</div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -10]
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function renderList() {
+      const list = document.getElementById('list');
+      list.innerHTML = '';
+      const visible = locations.filter(item => currentFilter === 'all' || item.status !== 'ok');
+      document.getElementById('countAll').textContent = visible.length;
+
+      visible.forEach(item => {
+        const peopleHtml = item.people.map(p => '<li>' + escapeHtml(p) + '</li>').join('');
+        const stateLabel =
+          item.status === 'ok' ? 'dopasowany adres' :
+          item.status === 'approx' ? 'przybliżenie' : 'współrzędne zapasowe';
+
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.innerHTML =
+          '<a class="jump" href="#" onclick="focusPin(' + item.nr + '); return false;">' +
+            '<h3>' + item.nr + '. ' + escapeHtml(item.label) + '</h3>' +
+          '</a>' +
+          '<div class="small"><strong>Wyszukiwanie:</strong> ' + escapeHtml(item.query) + '</div>' +
+          '<div class="small"><strong>Status:</strong> ' + stateLabel + '</div>' +
+          '<div class="small"><strong>Uwagi:</strong> ' + escapeHtml(item.notes) + '</div>' +
+          '<ul class="people">' + peopleHtml + '</ul>';
+        list.appendChild(div);
+      });
+    }
+
+    function buildPopup(item) {
+      const peopleHtml = item.people.map(p => '<li>' + escapeHtml(p) + '</li>').join('');
+      const stateLabel =
+        item.status === 'ok' ? 'Adres dopasowany automatycznie' :
+        item.status === 'approx' ? 'Przybliżenie z miejscowości / dzielnicy' :
+        'Użyto współrzędnych zapasowych';
+
+      return (
+        '<div style="min-width:260px">' +
+          '<div style="font-weight:700; margin-bottom:6px">' + item.nr + '. ' + escapeHtml(item.label) + '</div>' +
+          '<div style="font-size:12px; color:#666; margin-bottom:6px"><strong>Adres:</strong> ' + escapeHtml(item.query) + '</div>' +
+          '<div style="font-size:12px; color:#666; margin-bottom:6px"><strong>Status:</strong> ' + stateLabel + '</div>' +
+          '<div style="font-size:12px; color:#666; margin-bottom:6px"><strong>Uwagi:</strong> ' + escapeHtml(item.notes) + '</div>' +
+          '<ul style="padding-left:18px; margin:6px 0 0">' + peopleHtml + '</ul>' +
+        '</div>'
+      );
+    }
+
+    function addMarker(item) {
+      if (item.marker) {
+        map.removeLayer(item.marker);
+      }
+      item.marker = L.marker([item.lat, item.lon], { icon: iconFor(item.status, item.nr) })
+        .bindPopup(buildPopup(item))
+        .addTo(map);
+    }
+
+    function refreshMarkers() {
+      locations.forEach(item => {
+        if (item.marker) map.removeLayer(item.marker);
+      });
+      locations.forEach(item => {
+        const show = currentFilter === 'all' || item.status !== 'ok';
+        if (show) {
+          addMarker(item);
+        }
+      });
+      fitAll();
+      renderList();
+    }
+
+    function fitAll() {
+      const visibleMarkers = locations
+        .filter(item => currentFilter === 'all' || item.status !== 'ok')
+        .filter(item => item.marker)
+        .map(item => item.marker);
+
+      if (!visibleMarkers.length) return;
+      const group = L.featureGroup(visibleMarkers);
+      map.fitBounds(group.getBounds().pad(0.2));
+    }
+
+    function showOnly(mode) {
+      currentFilter = mode;
+      refreshMarkers();
+    }
+
+    function focusPin(nr) {
+      const item = locations.find(x => x.nr === nr);
+      if (!item || !item.marker) return;
+      map.setView([item.lat, item.lon], Math.max(map.getZoom(), 11));
+      item.marker.openPopup();
+    }
+
+    async function delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function geocode(item) {
+      const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=pl&q=' + encodeURIComponent(item.query);
+      try {
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          item.lat = parseFloat(data[0].lat);
+          item.lon = parseFloat(data[0].lon);
+          item.status = item.precision === 'adres' ? 'ok' : 'approx';
+          return;
+        }
+      } catch (err) {
+        console.warn('Geokodowanie nieudane dla', item.label, err);
+      }
+      item.lat = item.fallback_lat;
+      item.lon = item.fallback_lon;
+      item.status = (item.precision === 'miejscowość' || item.precision === 'dzielnica' || item.precision === 'miasto' || item.precision === 'dzielnica/obszar')
+        ? 'approx'
+        : 'fallback';
+    }
+
+    async function start() {
+      document.getElementById('status').textContent = 'Trwa geokodowanie adresów i dodawanie pinów…';
+      for (let i = 0; i < locations.length; i++) {
+        const item = locations[i];
+        document.getElementById('status').textContent =
+          'Dodawanie pinów: ' + (i + 1) + ' / ' + locations.length + ' — ' + item.label;
+        await geocode(item);
+        addMarker(item);
+        renderList();
+        await delay(1100);
+      }
+      fitAll();
+      const okCount = locations.filter(x => x.status === 'ok').length;
+      const approxCount = locations.filter(x => x.status === 'approx').length;
+      const fallbackCount = locations.filter(x => x.status === 'fallback').length;
+      document.getElementById('status').innerHTML =
+        'Gotowe. Zielone: <strong>' + okCount + '</strong>, pomarańczowe: <strong>' + approxCount + '</strong>, czerwone: <strong>' + fallbackCount + '</strong>.';
+      renderList();
+    }
+
+    renderList();
+    start();
+  </script>
+</body>
+</html>
