@@ -96,21 +96,6 @@
       font-size: 14px;
       line-height: 1.4;
     }
-    .item-top {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-    }
-    .pin-toggle {
-      margin-top: 3px;
-      transform: scale(1.15);
-      cursor: pointer;
-      flex: 0 0 auto;
-    }
-    .item-main {
-      min-width: 0;
-      flex: 1 1 auto;
-    }
     .controls {
       display: flex;
       gap: 8px;
@@ -200,12 +185,6 @@
         <button onclick="fitAll()">Pokaż wszystkie</button>
         <button onclick="showOnly('all')">Wszystkie</button>
         <button onclick="showOnly('approx')">Tylko przybliżone</button>
-        <button onclick="setAllEnabled(true)">Zaznacz wszystkie</button>
-        <button onclick="setAllEnabled(false)">Odznacz wszystkie</button>
-      </div>
-
-      <div class="sub" style="margin-top:-4px; margin-bottom:12px;">
-        Użyj checkboxów przy adresach, aby ukrywać i pokazywać konkretne pinezki na mapie.
       </div>
 
       <div class="status" id="status">Uruchamianie mapy…</div>
@@ -234,9 +213,6 @@
     }).addTo(map);
 
     let currentFilter = 'all';
-    locations.forEach(item => {
-      if (typeof item.enabled === 'undefined') item.enabled = true;
-    });
 
     function iconFor(status, nr) {
       return L.divIcon({
@@ -258,8 +234,7 @@
       const list = document.getElementById('list');
       list.innerHTML = '';
       const visible = locations.filter(item => currentFilter === 'all' || item.status !== 'ok');
-      const enabledCount = visible.filter(item => item.enabled).length;
-      document.getElementById('countAll').textContent = enabledCount + ' / ' + visible.length;
+      document.getElementById('countAll').textContent = visible.length;
 
       visible.forEach(item => {
         const peopleHtml = item.people.map(p => '<li>' + escapeHtml(p) + '</li>').join('');
@@ -270,19 +245,13 @@
         const div = document.createElement('div');
         div.className = 'item';
         div.innerHTML =
-          '<div class="item-top">' +
-            '<input class="pin-toggle" type="checkbox" ' + (item.enabled ? 'checked ' : '') +
-              'onchange="toggleItem(' + item.nr + ', this.checked)" title="Pokaż lub ukryj pinezkę">' +
-            '<div class="item-main">' +
-              '<a class="jump" href="#" onclick="focusPin(' + item.nr + '); return false;">' +
-                '<h3>' + item.nr + '. ' + escapeHtml(item.label) + '</h3>' +
-              '</a>' +
-              '<div class="small"><strong>Wyszukiwanie:</strong> ' + escapeHtml(item.query) + '</div>' +
-              '<div class="small"><strong>Status:</strong> ' + stateLabel + '</div>' +
-              '<div class="small"><strong>Uwagi:</strong> ' + escapeHtml(item.notes) + '</div>' +
-              '<ul class="people">' + peopleHtml + '</ul>' +
-            '</div>' +
-          '</div>';
+          '<a class="jump" href="#" onclick="focusPin(' + item.nr + '); return false;">' +
+            '<h3>' + item.nr + '. ' + escapeHtml(item.label) + '</h3>' +
+          '</a>' +
+          '<div class="small"><strong>Wyszukiwanie:</strong> ' + escapeHtml(item.query) + '</div>' +
+          '<div class="small"><strong>Status:</strong> ' + stateLabel + '</div>' +
+          '<div class="small"><strong>Uwagi:</strong> ' + escapeHtml(item.notes) + '</div>' +
+          '<ul class="people">' + peopleHtml + '</ul>';
         list.appendChild(div);
       });
     }
@@ -319,8 +288,8 @@
         if (item.marker) map.removeLayer(item.marker);
       });
       locations.forEach(item => {
-        const passesFilter = currentFilter === 'all' || item.status !== 'ok';
-        if (passesFilter && item.enabled) addMarker(item);
+        const show = currentFilter === 'all' || item.status !== 'ok';
+        if (show) addMarker(item);
       });
       fitAll();
       renderList();
@@ -328,7 +297,7 @@
 
     function fitAll() {
       const visibleMarkers = locations
-        .filter(item => (currentFilter === 'all' || item.status !== 'ok') && item.enabled)
+        .filter(item => currentFilter === 'all' || item.status !== 'ok')
         .filter(item => item.marker)
         .map(item => item.marker);
 
@@ -342,29 +311,9 @@
       refreshMarkers();
     }
 
-    function toggleItem(nr, enabled) {
-      const item = locations.find(x => x.nr === nr);
-      if (!item) return;
-      item.enabled = enabled;
-      refreshMarkers();
-    }
-
-    function setAllEnabled(enabled) {
-      locations.forEach(item => {
-        const passesFilter = currentFilter === 'all' || item.status !== 'ok';
-        if (passesFilter) item.enabled = enabled;
-      });
-      refreshMarkers();
-    }
-
     function focusPin(nr) {
       const item = locations.find(x => x.nr === nr);
-      if (!item) return;
-      if (!item.enabled) {
-        item.enabled = true;
-        refreshMarkers();
-      }
-      if (!item.marker) return;
+      if (!item || !item.marker) return;
       map.setView([item.lat, item.lon], Math.max(map.getZoom(), 11));
       item.marker.openPopup();
     }
@@ -414,8 +363,8 @@
       renderList();
     }
 
-    renderList();  
+    renderList();
     start();
   </script>
-</body> 
+</body>
 </html>
